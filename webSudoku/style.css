@@ -1,0 +1,11 @@
+.game {
+    margin:auto;
+    width: 50%;
+}
+
+.solve {
+    margin:auto;
+    width: 20%;
+    height: 20%;
+    font-size: 30px;
+}
