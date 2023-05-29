@@ -4,8 +4,21 @@
 }
 
 .solve {
-    margin:auto;
-    width: 20%;
+    margin-left:25%;
+    width: 10%;
     height: 20%;
     font-size: 30px;
+}
+
+.reset {
+    margin:auto;
+    width: 10%;
+    height: 20%;
+    font-size: 30px;
+}
+
+.buttons {
+    margin: auto;
+    width:100%;
+
 }

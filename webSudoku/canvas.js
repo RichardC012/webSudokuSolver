@@ -1,14 +1,14 @@
 var canvas = document.getElementById("myCanvas");
 var ctx = canvas.getContext("2d");
-var board = [[-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1]];
+var     board = [[0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0]];
 
 var solvedSquares = new Set();
 
@@ -68,15 +68,15 @@ document.addEventListener('keydown',async function(event) {
 });
 
 function resetBoard() {
-    board = [[-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1,-1]];
+    board = [[0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0]];
     solvedSquares = new Set();
     conflicts = new Set();
     updateCanvas();
@@ -99,7 +99,7 @@ async function solveSudoku() {
     let index = 0;
     let stack = [];
     let numChecked = 0;
-    while (board[getY(index)][getX(index)] != -1) {
+    while (board[getY(index)][getX(index)] != 0) {
         index++;
     }
     stack.push(getValidNumbers(getX(index), getY(index)));
@@ -107,7 +107,7 @@ async function solveSudoku() {
         updateCanvas();
         let tuple = stack[stack.length-1];
         if (tuple[1].size == 0) {
-            board[getY(tuple[0])][getX(tuple[0])] = -1;
+            board[getY(tuple[0])][getX(tuple[0])] = 0;
             solvedSquares.delete(tuple[0]);
             stack.pop();
             index = stack[stack.length-1][0];
@@ -119,7 +119,7 @@ async function solveSudoku() {
 
             solvedSquares.add(index);
 
-            while (index < 81 && board[getY(index)][getX(index)] != -1) {
+            while (index < 81 && board[getY(index)][getX(index)] != 0) {
                 index++;
             }
 
@@ -220,7 +220,7 @@ function getY(index) {
 function drawNumbers() {
     for (let i = 0; i < 9; i++) {
         for (let j = 0; j < 9; j++) {
-            if (board[j][i] != -1) {
+            if (board[j][i] != 0) {
                 drawNumber(board[j][i], i, j);
             }
         }
@@ -301,12 +301,28 @@ function drawGrid() {
     drawHorizontalLine(8 * SQUARE_SIZE);
 
     ctx.strokeStyle = 'black';
+    ctx.lineWidth = '1';
     drawVerticalLine(3 * SQUARE_SIZE);
     drawVerticalLine(6 * SQUARE_SIZE);
 
     drawHorizontalLine(3 * SQUARE_SIZE);
     drawHorizontalLine(6 * SQUARE_SIZE);
 
+}
+
+function setRandomPuzzle() {
+    board =[[0, 0, 0, 0, 0, 0, 0, 7, 2],
+            [0, 0, 0, 0, 4, 9, 8, 0, 0],
+            [3, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 4, 0, 0],
+            [0, 0, 4, 1, 0, 0, 7, 0, 0],
+            [1, 6, 0, 3, 0, 0, 0, 2, 0],
+            [6, 0, 0, 0, 5, 0, 0, 0, 4],
+            [5, 0, 0, 2, 0, 0, 0, 0, 0],
+            [0, 0, 8, 0, 9, 0, 0, 0, 0]];
+    solvedSquares = new Set();
+    conflicts = new Set();
+    updateCanvas();
 }
 
 updateCanvas();
