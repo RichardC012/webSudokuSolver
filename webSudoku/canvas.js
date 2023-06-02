@@ -1,6 +1,7 @@
 var canvas = document.getElementById("myCanvas");
 var ctx = canvas.getContext("2d");
-var     board = [[0, 0, 0, 0, 0, 0, 0, 0, 0],
+var     emptyBoard = 
+                [[0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -10,9 +11,21 @@ var     board = [[0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0]];
 
-var solvedSquares = new Set();
+var board = copyBoard(emptyBoard);
 
+var beforeSolveBoard = copyBoard(emptyBoard);
+
+var easyBoards;
+var mediumBoards;
+var hardBoards;
+var currBoard;
+
+var logicalBoard;
+
+
+var solvedSquares = new Set();
 var conflicts = new Set();
+
 
 const CANVAS_SIZE = 600;
 const SQUARE_SIZE = CANVAS_SIZE/9;
@@ -21,6 +34,11 @@ const DARK_BLUE = 'rgba(50, 100, 210, 0.3)';
 const LIGHT_RED = 'rgba(255, 0, 0, 0.5)';
 const LIGHT_GREEN = 'rgba(0, 200, 0, 0.2)';
 const LIGHT_GREY = '#BBBBBB';
+var sleepTime = 0.001;
+var inSolve = false;
+var squaresChecked = 0;
+var difficulty = "Easy";
+var solveStyle = "Backtracking";
 
 canvas.width = CANVAS_SIZE;
 canvas.height = CANVAS_SIZE;
@@ -32,6 +50,8 @@ var selected = {
     x: -1,
     y: -1,
 }
+
+startup();
 
 canvas.addEventListener('click', function(event) {
     var xClicked = Math.floor((event.pageX - canvasLeft)/SQUARE_SIZE),
@@ -52,7 +72,7 @@ document.addEventListener('keydown',async function(event) {
         board[selected.y][selected.x] = +key;
         checkConflict(selected.x, selected.y);
     } else if (key == "Backspace") {
-        board[selected.y][selected.x] = -1;
+        board[selected.y][selected.x] = 0;
         conflicts.delete(selected.x + selected.y * 9);
         for (const index of conflicts) {
             checkConflict(index % 9, Math.floor(index/9));
@@ -67,18 +87,31 @@ document.addEventListener('keydown',async function(event) {
     updateCanvas();
 });
 
+function startup() {
+    setPresetBoards();
+    updateCanvas();
+    setBacktracking();
+}
+
+function solveSudoku() {
+    if (solveStyle == "Backtracking") {
+        solveBacktracking();
+    } else if (solveStyle == "Logical") {
+        solveLogical();
+    }
+}
+
 function resetBoard() {
-    board = [[0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0]];
-    solvedSquares = new Set();
+    inSolve = false;
+    if (boardEquals(board, beforeSolveBoard)) {
+        board = copyBoard(emptyBoard);
+        beforeSolveBoard = copyBoard(emptyBoard);
+    } else {
+        board = copyBoard(beforeSolveBoard);
+    }
     conflicts = new Set();
+    solvedSquares = new Set();
+    squaresChecked = 0;
     updateCanvas();
 }
 
@@ -92,18 +125,26 @@ function updateCanvas() {
         drawSquares(selected.x, selected.y);
     }
     drawNumbers();
+    document.querySelector('#textButton').innerHTML = "Squares Checked: " + squaresChecked;
+    document.querySelector('#diffButton').innerHTML = "Difficulty: " + difficulty;
+    document.querySelector('#diffButton').innerText = "Difficulty: " + difficulty;
 }
 
-async function solveSudoku() {
+async function solveBacktracking() {
+    if (conflicts.size > 0) {
+        return;
+    }
+    beforeSolveBoard = copyBoard(board);
     solvedSquares = new Set();
     let index = 0;
     let stack = [];
-    let numChecked = 0;
+    squaresChecked = 0;
+    inSolve = true;
     while (board[getY(index)][getX(index)] != 0) {
         index++;
     }
     stack.push(getValidNumbers(getX(index), getY(index)));
-    while (stack.size != 0 && index < 81) {
+    while (stack.size != 0 && index < 81 && inSolve == true) {
         updateCanvas();
         let tuple = stack[stack.length-1];
         if (tuple[1].size == 0) {
@@ -125,13 +166,17 @@ async function solveSudoku() {
 
             if (index < 81) {
                 stack.push(getValidNumbers(getX(index), getY(index)));
-                numChecked++;
+                squaresChecked += 1;
             }
         }
-        await sleep(0.001);
+        await sleep(sleepTime);
         updateCanvas();
     }
-    console.log(numChecked);
+    console.log(squaresChecked);
+}
+
+async function solveLogical() {
+    
 }
 
 async function sleep(seconds) {
@@ -229,7 +274,7 @@ function drawNumbers() {
 
 function drawNumber(number, x, y) {
     ctx.fillStyle = 'black';
-    ctx.font = '48px Arial';
+    ctx.font = '48px Lato';
     ctx.fillText(number.toString(), SQUARE_SIZE * (x + 0.31), SQUARE_SIZE * (y + 0.75));
 }
 
@@ -310,20 +355,242 @@ function drawGrid() {
 
 }
 
+function setBacktracking() {
+    solveStyle = "Backtracking";
+    document.getElementById('logicalButton').style.backgroundColor = 'rgb(17, 81, 199)';
+    document.getElementById('backtrackingButton').style.backgroundColor = "rgb(30, 185, 113)";
+}
+
+function setLogical() {
+    solveStyle = "Logical";
+    document.getElementById('backtrackingButton').style.backgroundColor = 'rgb(17, 81, 199)';
+    document.getElementById('logicalButton').style.backgroundColor = "rgb(30, 185, 113)";
+}
+
+function toggleDifficulty() {
+    if (difficulty == "Easy") {
+        difficulty = "Medium";
+    } else if (difficulty == "Medium") {
+        difficulty = "Hard";
+    } else if (difficulty == "Hard") {
+        difficulty = "Easy";
+    } else {
+        difficulty = "Easy";
+    }
+    updateCanvas();
+}
+
+function boardEquals(a, b){
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (a[i][j] != b[i][j]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function copyBoard(b) {
+    let newBoard = []
+    for (let i = 0; i < 9; i++) {
+        let row = b[i].slice();
+        newBoard.push(row)
+    }
+    return newBoard;
+}
+
+
 function setRandomPuzzle() {
-    board =[[0, 0, 0, 0, 0, 0, 0, 7, 2],
-            [0, 0, 0, 0, 4, 9, 8, 0, 0],
-            [3, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 4, 0, 0],
-            [0, 0, 4, 1, 0, 0, 7, 0, 0],
-            [1, 6, 0, 3, 0, 0, 0, 2, 0],
-            [6, 0, 0, 0, 5, 0, 0, 0, 4],
-            [5, 0, 0, 2, 0, 0, 0, 0, 0],
-            [0, 0, 8, 0, 9, 0, 0, 0, 0]];
+    inSolve = false;
+    board = copyBoard(getBoard());
+    beforeSolveBoard = copyBoard(emptyBoard);
+    squaresChecked = 0;
     solvedSquares = new Set();
     conflicts = new Set();
     updateCanvas();
 }
 
-updateCanvas();
+function getBoard() {
+    if (difficulty == "Easy") {
+        return getRandomFromBoard(easyBoards);
+    } else if (difficulty == "Medium") {
+        return getRandomFromBoard(mediumBoards);
+    } else if (difficulty == "Hard") {
+        return getRandomFromBoard(hardBoards);
+    } else {
+        return easyBoards[0];
+    }
+}
 
+function getRandomFromBoard(board) {
+    idx = Math.floor(Math.random() * board.length);
+    while (idx == currBoard) {
+        idx = Math.floor(Math.random() * board.length);
+    }
+    currBoard = idx;
+    return board[idx];
+}
+
+function setPresetBoards() {
+    easyBoards =
+    [
+    [[5, 0, 0, 4, 0, 7, 9, 0, 3],
+    [0, 0, 2, 0, 1, 0, 0, 8, 7],
+    [1, 0, 0, 6, 8, 0, 0, 0, 4],
+    [8, 0, 0, 3, 0, 0, 7, 0, 0],
+    [0, 2, 6, 0, 0, 1, 3, 4, 5],
+    [4, 7, 0, 0, 5, 0, 0, 0, 0],
+    [0, 0, 0, 0, 3, 2, 4, 0, 9],
+    [0, 3, 0, 0, 0, 8, 0, 6, 2],
+    [0, 0, 9, 7, 6, 0, 5, 0, 8]],
+
+    [[0, 3, 0, 0, 0, 0, 5, 0, 0],
+    [0, 0, 0, 0, 3, 7, 0, 0, 1],
+    [7, 0, 2, 1, 6, 0, 0, 0, 0],
+    [0, 1, 7, 5, 9, 6, 0, 3, 8],
+    [0, 0, 0, 2, 0, 0, 0, 4, 5],
+    [5, 2, 8, 0, 7, 4, 0, 1, 9],
+    [3, 0, 5, 0, 0, 9, 1, 0, 0],
+    [0, 7, 4, 0, 0, 0, 9, 0, 2],
+    [0, 0, 0, 6, 0, 0, 0, 0, 7]],
+
+    [[0, 0, 0, 0, 1, 5, 3, 7, 0],
+    [0, 5, 8, 7, 0, 3, 4, 0, 0],
+    [3, 4, 7, 0, 2, 8, 0, 0, 0],
+    [5, 1, 0, 6, 7, 0, 0, 0, 4],
+    [6, 0, 0, 8, 0, 0, 0, 5, 7],
+    [8, 0, 0, 0, 0, 9, 0, 1, 0],
+    [4, 6, 9, 0, 0, 0, 0, 0, 2],
+    [0, 8, 1, 3, 0, 0, 0, 0, 0],
+    [7, 3, 0, 2, 0, 0, 1, 9, 0]],
+
+    [[3, 0, 0, 0, 9, 0, 8, 2, 0],
+    [0, 1, 0, 6, 0, 0, 0, 0, 0],
+    [0, 0, 0, 4, 3, 0, 0, 7, 6],
+    [0, 9, 1, 0, 0, 0, 6, 4, 0],
+    [0, 0, 0, 0, 2, 0, 0, 0, 8],
+    [6, 0, 8, 9, 0, 0, 0, 0, 0],
+    [7, 0, 6, 3, 0, 9, 2, 5, 4],
+    [1, 2, 3, 5, 0, 8, 0, 6, 9],
+    [0, 4, 0, 2, 0, 7, 0, 0, 0]],
+
+    [[0, 0, 0, 3, 0, 1, 0, 6, 0],
+    [0, 0, 0, 0, 0, 8, 0, 4, 2],
+    [6, 3, 8, 4, 2, 5, 1, 9, 7],
+    [3, 9, 4, 0, 7, 0, 0, 0, 0],
+    [2, 0, 0, 1, 0, 0, 4, 7, 0],
+    [0, 0, 0, 0, 0, 4, 0, 0, 6],
+    [1, 2, 3, 9, 0, 0, 6, 8, 0],
+    [0, 8, 9, 0, 0, 6, 0, 0, 4],
+    [0, 4, 0, 0, 0, 0, 2, 1, 0]]
+    
+    ];
+
+    mediumBoards =
+    [
+    [[0, 0, 0, 0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 3, 1, 0, 0, 5, 0],
+    [5, 1, 3, 0, 0, 0, 2, 4, 9],
+    [0, 4, 9, 0, 5, 0, 0, 0, 1],
+    [0, 8, 0, 0, 0, 1, 0, 0, 0],
+    [6, 0, 1, 0, 0, 3, 4, 7, 0],
+    [0, 7, 8, 0, 0, 0, 0, 2, 4],
+    [4, 2, 0, 0, 9, 7, 0, 0, 0],
+    [0, 0, 0, 0, 0, 4, 7, 0, 5]],
+
+    [[0, 0, 2, 3, 7, 0, 0, 5, 0],
+    [1, 0, 0, 0, 2, 9, 0, 0, 0],
+    [0, 0, 4, 0, 6, 1, 0, 0, 0],
+    [0, 0, 0, 0, 0, 4, 0, 0, 6],
+    [6, 0, 0, 2, 5, 0, 0, 1, 8],
+    [0, 2, 7, 0, 0, 0, 0, 0, 5],
+    [4, 0, 0, 8, 3, 0, 5, 0, 1],
+    [0, 0, 0, 0, 0, 0, 9, 0, 0],
+    [7, 5, 0, 0, 0, 0, 0, 4, 2]],
+
+    [[0, 6, 0, 0, 0, 0, 0, 0, 0],
+    [3, 8, 1, 6, 0, 0, 7, 0, 0],
+    [0, 0, 9, 0, 2, 0, 0, 0, 0],
+    [0, 0, 0, 9, 0, 2, 8, 0, 3],
+    [2, 0, 0, 3, 0, 4, 0, 6, 0],
+    [0, 0, 0, 0, 8, 5, 0, 2, 4],
+    [0, 1, 0, 0, 9, 0, 2, 0, 0],
+    [0, 0, 0, 2, 0, 0, 0, 4, 7],
+    [8, 0, 0, 7, 0, 3, 0, 0, 1]],
+
+    [[0, 0, 0, 1, 0, 5, 9, 8, 4],
+    [8, 0, 3, 0, 0, 6, 0, 0, 7],
+    [0, 9, 0, 0, 2, 8, 0, 1, 0],
+    [0, 0, 5, 6, 0, 0, 8, 0, 0],
+    [0, 0, 0, 0, 1, 2, 0, 0, 0],
+    [2, 4, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 1, 0, 6, 0, 3, 0, 0],
+    [7, 3, 0, 0, 8, 0, 0, 0, 9],
+    [9, 0, 2, 4, 0, 0, 0, 0, 0]],
+
+    [[2, 0, 0, 0, 0, 8, 0, 0, 0],
+    [0, 9, 0, 0, 4, 0, 0, 8, 7],
+    [8, 0, 0, 0, 0, 7, 0, 5, 4],
+    [0, 1, 0, 6, 8, 0, 0, 0, 0],
+    [9, 0, 0, 7, 0, 0, 1, 0, 0],
+    [0, 0, 4, 0, 1, 0, 5, 3, 0],
+    [0, 0, 1, 0, 2, 0, 0, 0, 0],
+    [4, 0, 0, 8, 0, 1, 0, 0, 6],
+    [0, 0, 6, 4, 0, 3, 8, 0, 0]]
+    
+    ];
+
+    hardBoards =
+    [
+    [[5, 0, 0, 0, 0, 8, 0, 0, 0],
+    [0, 0, 0, 7, 0, 0, 2, 0, 0],
+    [4, 0, 9, 0, 1, 0, 0, 7, 0],
+    [9, 0, 3, 0, 0, 4, 6, 0, 0],
+    [0, 5, 0, 0, 0, 0, 0, 9, 0],
+    [0, 2, 0, 0, 3, 0, 0, 0, 0],
+    [7, 0, 1, 0, 4, 0, 0, 2, 0],
+    [0, 0, 0, 0, 0, 6, 0, 0, 8],
+    [0, 3, 0, 0, 0, 0, 0, 0, 0]],
+
+    [[0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0]],
+
+    [[7, 0, 6, 9, 0, 3, 0, 0, 4],
+    [0, 3, 0, 0, 8, 0, 0, 0, 0],
+    [0, 0, 0, 0, 2, 0, 0, 9, 0],
+    [0, 0, 4, 0, 0, 0, 1, 0, 0],
+    [0, 0, 0, 0, 3, 0, 0, 0, 0],
+    [0, 6, 0, 5, 0, 7, 0, 8, 0],
+    [5, 0, 0, 0, 0, 0, 0, 0, 8],
+    [0, 0, 0, 2, 0, 0, 0, 0, 0],
+    [0, 7, 0, 6, 0, 9, 0, 5, 0]],
+
+    [[0, 0, 1, 6, 2, 0, 0, 5, 7],
+    [0, 0, 0, 0, 0, 0, 0, 0, 9],
+    [0, 4, 0, 1, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 6, 0, 4, 0, 0],
+    [0, 3, 0, 0, 0, 7, 0, 6, 5],
+    [0, 0, 5, 0, 0, 0, 9, 0, 0],
+    [0, 0, 0, 0, 0, 0, 6, 0, 0],
+    [8, 0, 0, 0, 0, 3, 0, 0, 0],
+    [0, 0, 4, 0, 7, 0, 0, 2, 1]],
+
+    [[0, 4, 0, 9, 0, 0, 2, 0, 0],
+    [0, 6, 0, 0, 0, 5, 0, 0, 0],
+    [2, 0, 5, 0, 8, 0, 0, 0, 7],
+    [0, 0, 6, 0, 0, 0, 0, 0, 0],
+    [5, 0, 7, 0, 0, 1, 9, 0, 0],
+    [0, 0, 0, 0, 4, 0, 0, 1, 0],
+    [0, 0, 0, 3, 0, 0, 0, 0, 8],
+    [0, 2, 0, 0, 0, 0, 0, 0, 0],
+    [9, 0, 1, 0, 0, 4, 7, 0, 0]]
+    ];
+}

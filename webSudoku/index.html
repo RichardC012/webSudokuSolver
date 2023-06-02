@@ -4,15 +4,30 @@
         <meta charset="UTF-8">
         <title>Sudoku Solver Visualizer</title>
         <link rel="stylesheet" href="style.css">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300&display=swap" rel="stylesheet">
     </head>
-    <body>
+    <body class = "body" onload="startup()">
+        <header class = 'header'>
+            <b class = 'titleText'>
+                Sudoku Solver
+            </b>
+            <button class="topButton backtracking" id="backtrackingButton" onclick="setBacktracking()">Backtracking</button>
+            <button class="topButton logical" id ="logicalButton" onclick="setLogical()">Logical(WIP)</button>
+            <button class="topButton difficulty" id = "diffButton" onclick="toggleDifficulty()">Difficulty: Easy</button>
+        </header>
         <div class="game">
-            <canvas id="myCanvas" style="border: 1px solid black"></canvas>
+            <canvas class = "canvas" id="myCanvas" style="border: 1px solid black"></canvas>
             <script src="canvas.js"></script>
         </div>
-        <div class="buttons">
-            <button class="solve" onclick="solveSudoku()">solve</button>
-            <button class="reset" onclick="resetBoard()">reset</button>
+        <div class="buttonDiv">
+            <button class="solve bigButton" onclick="solveSudoku()">Solve</button>
+            <button class="reset bigButton" onclick="resetBoard()">Reset</button>
+            <button class="setPuzzle bigButton" onclick="setRandomPuzzle()">Random</button>
+        </div>
+        <div class = "buttonDiv">
+            <button class="textButton" id="textButton" disabled>Squares Checked: 0 </button>
         </div>
     </body>
 </html>
