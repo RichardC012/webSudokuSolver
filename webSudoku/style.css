@@ -23,6 +23,7 @@
     padding-right: 0;
     margin-left: 33%;
     display: inline-block;
+    cursor: pointer;
 }
 
 .header {

@@ -24,18 +24,21 @@ var logicalBoard;
 
 
 var solvedSquares = new Set();
+var originalSquares = new Set();
 var conflicts = new Set();
-
 
 const CANVAS_SIZE = 600;
 const SQUARE_SIZE = CANVAS_SIZE/9;
 const LIGHT_BLUE = 'rgba(84, 194, 237, 0.2)';
 const DARK_BLUE = 'rgba(50, 100, 210, 0.3)';
 const LIGHT_RED = 'rgba(255, 0, 0, 0.5)';
+const LIGHTER_RED = 'rgba(200, 0, 0, 0.2)';
 const LIGHT_GREEN = 'rgba(0, 200, 0, 0.2)';
 const LIGHT_GREY = '#BBBBBB';
+const DARK_GREY = '#888888';
 var sleepTime = 0.001;
 var inSolve = false;
+var solvingLogical = false;
 var squaresChecked = 0;
 var difficulty = "Easy";
 var solveStyle = "Backtracking";
@@ -53,21 +56,41 @@ var selected = {
 
 startup();
 
+function startup() {
+    setPresetBoards();
+    setBacktracking();
+    startupDrawCanvas();
+}
+
+// Same as update canvas but without buttons because for some reason document.getElementById("#textButton") returns NULL and that disables canvas interactivity
+function startupDrawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawConflicts();
+    drawSolvedSqaures();
+    drawGrid();
+    if (selected.x != -1 && selected.y != -1) {
+        drawSquares(selected.x, selected.y);
+    }
+    if (!solvingLogical) {
+        drawNumbers();
+    } else {
+        drawLogicalNumbers();
+    }
+}
+
+// ####### CANVAS INTERACTION AND DRAWING #######
+
 canvas.addEventListener('click', function(event) {
-    var xClicked = Math.floor((event.pageX - canvasLeft)/SQUARE_SIZE),
-        yClicked = Math.floor((event.pageY - canvasTop)/SQUARE_SIZE);
-    
+    let xClicked = Math.floor((event.pageX - canvasLeft)/SQUARE_SIZE);
+    let yClicked = Math.floor((event.pageY - canvasTop)/SQUARE_SIZE);
     selected.x = xClicked;
     selected.y = yClicked;
-
     updateCanvas();
-
  }, false);
 
 document.addEventListener('keydown',async function(event) {
     var key = event.key;
-
-
     if (/[1-9]/.test(key)) {
         board[selected.y][selected.x] = +key;
         checkConflict(selected.x, selected.y);
@@ -87,21 +110,8 @@ document.addEventListener('keydown',async function(event) {
     updateCanvas();
 });
 
-function startup() {
-    setPresetBoards();
-    updateCanvas();
-    setBacktracking();
-}
-
-function solveSudoku() {
-    if (solveStyle == "Backtracking") {
-        solveBacktracking();
-    } else if (solveStyle == "Logical") {
-        solveLogical();
-    }
-}
-
 function resetBoard() {
+    selected.x, selected.y = -1, -1;
     inSolve = false;
     if (boardEquals(board, beforeSolveBoard)) {
         board = copyBoard(emptyBoard);
@@ -124,10 +134,24 @@ function updateCanvas() {
     if (selected.x != -1 && selected.y != -1) {
         drawSquares(selected.x, selected.y);
     }
-    drawNumbers();
-    document.querySelector('#textButton').innerHTML = "Squares Checked: " + squaresChecked;
-    document.querySelector('#diffButton').innerHTML = "Difficulty: " + difficulty;
-    document.querySelector('#diffButton').innerText = "Difficulty: " + difficulty;
+    if (!solvingLogical) {
+        drawNumbers();
+    } else {
+        drawLogicalNumbers();
+    }
+    document.getElementById('textButton').innerText = "Squares Checked: " + squaresChecked;
+    document.getElementById('diffButton').innerText = "Difficulty: " + difficulty;
+}
+
+// ###### SOLVING FUNCTIONS ######
+
+function solveSudoku() {
+    selected.x, selected.y = -1, -1;
+    if (solveStyle == "Backtracking") {
+        solveBacktracking();
+    } else if (solveStyle == "Logical") {
+        solveLogical();
+    }
 }
 
 async function solveBacktracking() {
@@ -166,7 +190,6 @@ async function solveBacktracking() {
 
             if (index < 81) {
                 stack.push(getValidNumbers(getX(index), getY(index)));
-                squaresChecked += 1;
             }
         }
         await sleep(sleepTime);
@@ -176,7 +199,115 @@ async function solveBacktracking() {
 }
 
 async function solveLogical() {
+    logicalBoard = [];
+    solvedSquares = new Set();
+    originalSquares = new Set();
+    squaresChecked = 0;
+    inSolve = true;
+    solvingLogical = true;
+    for (let i = 0; i < 9; i ++) {
+        rowArr = [];
+        let validNumSet;
+        for (let j = 0; j < 9; j++) {
+            if (board[i][j] == 0) {
+                validNumSet = getValidNumbers(j,i)[1];
+                if (validNumSet.size == 1) {
+                    solvedSquares.add(i * 9 + j);
+                }
+            } else {
+                originalSquares.add(i * 9 + j);
+                validNumSet = new Set();
+                validNumSet.add(board[i][j]);
+            }
+            rowArr.push(validNumSet);
+            
+            if(solvedSquares.has(i * 9 + j)) {
+                drawNumber(validNumSet.values().next().value, j, i);
+                drawSquare(LIGHT_GREEN, j, i);
+            } else if (!originalSquares.has(i * 9 + j)) {
+                drawSmallNumber(validNumSet, i * 9 + j);
+            }
+            document.querySelector('#textButton').innerHTML = "Squares Checked: " + squaresChecked;
+            await sleep(sleepTime);
+        }
+        logicalBoard.push(rowArr);
+    }
     
+    for (let index of solvedSquares) {
+        updateCanvas()
+        eliminateNum(logicalBoard[getY(index)][getX(index)].values().next().value, getX(index), getY(index));
+        await sleep(sleepTime * 100);
+    }
+
+    for (let i = 0; i < 20; i++) {
+        await findNakedSingles();
+        findHiddenSingles();
+        findPointingPairs();
+        findNakedDoubles();
+    }
+    updateCanvas();
+    inSolve = false;
+    solvingLogical = false;
+}
+
+async function findNakedSingles() {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            index = i * 9 + j;
+            if (!solvedSquares.has(index) && !originalSquares.has(index)) {
+                if (logicalBoard[i][j].size == 1) {
+                    solvedSquares.add(index);
+                    updateCanvas();
+                    eliminateNum(logicalBoard[i][j].values().next().value, j, i);
+                    await sleep(sleepTime * 100);
+                }
+            }
+        }
+    }
+}
+
+function findHiddenSingles() {
+
+}
+
+function findPointingPairs() {
+
+}
+
+function findNakedDoubles() {
+
+}
+
+function eliminateNum(number, x, y) {
+    squaresChecked++;
+    for (let i = 0; i < 9; i++) {
+        // Checks the column
+        if (i < Math.floor(y/3) * 3 || i >= Math.floor(y/3) * 3 + 3) {
+            if (y != i) {
+                logicalBoard[i][x].delete(number);
+                drawOutline(LIGHTER_RED, x, i);
+            }
+        }
+        // Checks the row
+        if (i < Math.floor(x/3) * 3 || i >= Math.floor(x/3) * 3 + 3) {
+            if (x != i) {
+                logicalBoard[y][i].delete(number);
+                drawOutline(LIGHTER_RED, i, y);
+            }
+        }
+    }
+
+    let xFloor = Math.floor(x/3) * 3;
+    let yFloor = Math.floor(y/3) * 3;
+    // Checks the square
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            if ((y != (yFloor + j) || x != (xFloor + i))) {
+                logicalBoard[yFloor + j][xFloor + i].delete(number);
+                drawOutline(LIGHTER_RED, xFloor + i, yFloor + j);
+            }
+        }
+    }
 }
 
 async function sleep(seconds) {
@@ -185,12 +316,12 @@ async function sleep(seconds) {
 
 // returns a tuple [index, set]
 function getValidNumbers(x, y) {
+    squaresChecked++;
     const newSet = new Set([1,2,3,4,5,6,7,8,9]);
     
     for (let i = 0; i < 9; i++) {
         newSet.delete(board[y][i]);
         newSet.delete(board[i][x]);
-        
     }
 
     let xFloor = Math.floor(x/3) * 3;
@@ -201,12 +332,6 @@ function getValidNumbers(x, y) {
         }
     }
     return [x + y * 9, newSet];
-}
-
-function drawSolvedSqaures() {
-    for (index of solvedSquares) {
-        drawSquare(LIGHT_GREEN, getX(index), getY(index));
-    }
 }
 
 function checkConflict(x, y) {
@@ -248,10 +373,24 @@ function checkConflict(x, y) {
     return conflicted;
 }
 
-function drawConflicts() {
-    for (const index of conflicts) {
-        drawOutline(LIGHT_RED, index % 9, Math.floor(index/9));
+function boardEquals(a, b){
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (a[i][j] != b[i][j]) {
+                return false;
+            }
+        }
     }
+    return true;
+}
+
+function copyBoard(b) {
+    let newBoard = []
+    for (let i = 0; i < 9; i++) {
+        let row = b[i].slice();
+        newBoard.push(row)
+    }
+    return newBoard;
 }
 
 function getX(index) {
@@ -260,6 +399,38 @@ function getX(index) {
 
 function getY(index) {
     return Math.floor(index/9);
+}
+
+// ###### DRAW FUNCTIONS ######
+
+function drawLogicalNumbers() {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if(solvedSquares.has(i * 9 + j)) {
+                drawNumber(logicalBoard[i][j].values().next().value, j, i);
+            } else if (originalSquares.has(i * 9 + j)) {
+                drawNumber(logicalBoard[i][j].values().next().value, j, i);
+            } else {
+                drawSmallNumber(logicalBoard[i][j], i * 9 + j);
+            }
+        }
+    }
+}
+
+function drawSmallNumber(numset, index) {
+    ctx.fillStyle = DARK_GREY;
+    ctx.font = 'bold 23px Lato';
+    for (number of numset) {
+        let xPos = SQUARE_SIZE * (getX(index) + 0.32 * ((number - 1) % 3) + 0.07);
+        let yPos = SQUARE_SIZE * (getY(index) + 0.30 * (Math.floor((number - 1)/3) + 1.08));
+        ctx.fillText(number.toString(), xPos, yPos);
+    }
+}
+
+function drawConflicts() {
+    for (const index of conflicts) {
+        drawOutline(LIGHT_RED, getX(index), getY(index));
+    }
 }
 
 function drawNumbers() {
@@ -276,6 +447,12 @@ function drawNumber(number, x, y) {
     ctx.fillStyle = 'black';
     ctx.font = '48px Lato';
     ctx.fillText(number.toString(), SQUARE_SIZE * (x + 0.31), SQUARE_SIZE * (y + 0.75));
+}
+
+function drawSolvedSqaures() {
+    for (index of solvedSquares) {
+        drawSquare(LIGHT_GREEN, getX(index), getY(index));
+    }
 }
 
 function drawSquares(x, y) {
@@ -355,6 +532,8 @@ function drawGrid() {
 
 }
 
+// ###### BUTTON FUNCTIONALITY ######
+
 function setBacktracking() {
     solveStyle = "Backtracking";
     document.getElementById('logicalButton').style.backgroundColor = 'rgb(17, 81, 199)';
@@ -380,27 +559,6 @@ function toggleDifficulty() {
     updateCanvas();
 }
 
-function boardEquals(a, b){
-    for (let i = 0; i < 9; i++) {
-        for (let j = 0; j < 9; j++) {
-            if (a[i][j] != b[i][j]) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-function copyBoard(b) {
-    let newBoard = []
-    for (let i = 0; i < 9; i++) {
-        let row = b[i].slice();
-        newBoard.push(row)
-    }
-    return newBoard;
-}
-
-
 function setRandomPuzzle() {
     inSolve = false;
     board = copyBoard(getBoard());
@@ -424,6 +582,7 @@ function getBoard() {
 }
 
 function getRandomFromBoard(board) {
+    selected.x, selected.y = -1, -1;
     idx = Math.floor(Math.random() * board.length);
     while (idx == currBoard) {
         idx = Math.floor(Math.random() * board.length);
@@ -445,7 +604,7 @@ function setPresetBoards() {
     [0, 3, 0, 0, 0, 8, 0, 6, 2],
     [0, 0, 9, 7, 6, 0, 5, 0, 8]],
 
-    [[0, 3, 0, 0, 0, 0, 5, 0, 0],
+    [[9, 3, 0, 0, 0, 0, 5, 0, 0],
     [0, 0, 0, 0, 3, 7, 0, 0, 1],
     [7, 0, 2, 1, 6, 0, 0, 0, 0],
     [0, 1, 7, 5, 9, 6, 0, 3, 8],
@@ -552,16 +711,6 @@ function setPresetBoards() {
     [7, 0, 1, 0, 4, 0, 0, 2, 0],
     [0, 0, 0, 0, 0, 6, 0, 0, 8],
     [0, 3, 0, 0, 0, 0, 0, 0, 0]],
-
-    [[0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0]],
 
     [[7, 0, 6, 9, 0, 3, 0, 0, 4],
     [0, 3, 0, 0, 8, 0, 0, 0, 0],
