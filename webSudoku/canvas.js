@@ -113,6 +113,7 @@ document.addEventListener('keydown',async function(event) {
 function resetBoard() {
     selected.x, selected.y = -1, -1;
     inSolve = false;
+    solvingLogical = false;
     if (boardEquals(board, beforeSolveBoard)) {
         board = copyBoard(emptyBoard);
         beforeSolveBoard = copyBoard(emptyBoard);
@@ -199,6 +200,7 @@ async function solveBacktracking() {
 }
 
 async function solveLogical() {
+    beforeSolveBoard = copyBoard(board);
     logicalBoard = [];
     solvedSquares = new Set();
     originalSquares = new Set();
@@ -213,6 +215,7 @@ async function solveLogical() {
                 validNumSet = getValidNumbers(j,i)[1];
                 if (validNumSet.size == 1) {
                     solvedSquares.add(i * 9 + j);
+                    board[i][j] = validNumSet.values().next().value;
                 }
             } else {
                 originalSquares.add(i * 9 + j);
@@ -239,15 +242,23 @@ async function solveLogical() {
         await sleep(sleepTime * 100);
     }
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 5; i++) {
         await findNakedSingles();
-        findHiddenSingles();
+        await findHiddenSingles();
         findPointingPairs();
         findNakedDoubles();
+        if (solvedLogical()) {
+            updateCanvas();
+            inSolve = false;
+            solvingLogical = false;
+            return;
+        }
     }
+
+    logicalDFS()
+
     updateCanvas();
-    inSolve = false;
-    solvingLogical = false;
+    
 }
 
 async function findNakedSingles() {
@@ -257,17 +268,97 @@ async function findNakedSingles() {
             if (!solvedSquares.has(index) && !originalSquares.has(index)) {
                 if (logicalBoard[i][j].size == 1) {
                     solvedSquares.add(index);
+                    board[i][j] = logicalBoard[i][j].values().next().value;
                     updateCanvas();
                     eliminateNum(logicalBoard[i][j].values().next().value, j, i);
-                    await sleep(sleepTime * 100);
+                    await sleep(sleepTime * 10);
                 }
             }
         }
     }
 }
 
-function findHiddenSingles() {
+async function findHiddenSingles() {
+    // Check every Row
+    for (let i = 0; i < 9; i++) {
+        singleMap = new Map();
+        highlightRow(i, DARK_BLUE);
+        await sleep(sleepTime * 100);
+        updateCanvas();
+        for (let j = 0; j < 9; j++) {
+            let index = i * 9 + j;
+            if (!solvedSquares.has(index) && !originalSquares.has(index)) {
+                squaresChecked++;
+                for (let num of logicalBoard[i][j]) {
+                    if (!singleMap.has(num)) {
+                        singleMap.set(num, j);
+                    } else {
+                        singleMap.set(num, -1);
+                    }
+                }
+            }
+        }
+        const numIterator = singleMap[Symbol.iterator]();
+        for (const item of numIterator) {
+            let index = i * 9 + item[1];
+            if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index)) {
+                let j = item[1];
+                let newSet = new Set();
+                newSet.add(item[0]);
+                logicalBoard[i][j] = newSet;
+                solvedSquares.add(i * 9 + j);
+                board[i][j] = item[0];
+                
+                updateCanvas();
+                highlightRow(i, DARK_BLUE);
+                await sleep(sleepTime * 10);
 
+                updateCanvas()
+                eliminateNum(item[0], j, i);
+                await sleep(sleepTime * 10);
+            }
+        }
+    }
+    
+    // Check every Column
+    for (let j = 0; j < 9; j++) {
+        singleMap = new Map();
+        highlightColumn(j, DARK_BLUE);
+        await sleep(sleepTime * 100);
+        updateCanvas();
+        for (let i = 0; i < 9; i++) {
+            let index = i * 9 + j;
+            if (!solvedSquares.has(index) && !originalSquares.has(index)) {
+                squaresChecked++;
+                for (let num of logicalBoard[i][j]) {
+                    if (!singleMap.has(num)) {
+                        singleMap.set(num, i);
+                    } else {
+                        singleMap.set(num, -1);
+                    }
+                }
+            }
+        }
+        const numIterator = singleMap[Symbol.iterator]();
+        for (const item of numIterator) {
+            let index = item[1] * 9 + j;
+            if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index)) {
+                let i = item[1];
+                let newSet = new Set();
+                newSet.add(item[0]);
+                logicalBoard[i][j] = newSet;
+                solvedSquares.add(i * 9 + j);
+                
+                updateCanvas();
+                highlightColumn(j, DARK_BLUE);
+                await sleep(sleepTime * 10);
+
+                updateCanvas()
+                eliminateNum(item[0], j, i);
+                await sleep(sleepTime * 10);
+            }
+        }
+    }
 }
 
 function findPointingPairs() {
@@ -278,6 +369,21 @@ function findNakedDoubles() {
 
 }
 
+function logicalDFS() {
+    
+}
+
+function solvedLogical() {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (logicalBoard[i][j].size >= 2) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 function eliminateNum(number, x, y) {
     squaresChecked++;
     for (let i = 0; i < 9; i++) {
@@ -285,14 +391,14 @@ function eliminateNum(number, x, y) {
         if (i < Math.floor(y/3) * 3 || i >= Math.floor(y/3) * 3 + 3) {
             if (y != i) {
                 logicalBoard[i][x].delete(number);
-                drawOutline(LIGHTER_RED, x, i);
+                drawThickOutline(LIGHTER_RED, x, i);
             }
         }
         // Checks the row
         if (i < Math.floor(x/3) * 3 || i >= Math.floor(x/3) * 3 + 3) {
             if (x != i) {
                 logicalBoard[y][i].delete(number);
-                drawOutline(LIGHTER_RED, i, y);
+                drawThickOutline(LIGHTER_RED, i, y);
             }
         }
     }
@@ -403,6 +509,18 @@ function getY(index) {
 
 // ###### DRAW FUNCTIONS ######
 
+function highlightRow(rowNum, color) {
+    for (let i = 0; i < 9; i++) {
+        drawThickOutline(color, i, rowNum);
+    }
+}
+
+function highlightColumn(colNum, color) {
+    for (let i = 0; i < 9; i++) {
+        drawThickOutline(color, colNum, i);
+    }
+}
+
 function drawLogicalNumbers() {
     for (let i = 0; i < 9; i++) {
         for (let j = 0; j < 9; j++) {
@@ -486,6 +604,14 @@ function drawSquare(color, x, y) {
 function drawOutline(color, x, y) {
     ctx.strokeStyle = color;
     ctx.lineWidth = '3';
+    ctx.beginPath();
+    ctx.rect(x * SQUARE_SIZE + 1, y * SQUARE_SIZE + 1, SQUARE_SIZE - 2, SQUARE_SIZE - 2);
+    ctx.stroke();
+}
+
+function drawThickOutline(color, x, y) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = '6';
     ctx.beginPath();
     ctx.rect(x * SQUARE_SIZE + 1, y * SQUARE_SIZE + 1, SQUARE_SIZE - 2, SQUARE_SIZE - 2);
     ctx.stroke();
