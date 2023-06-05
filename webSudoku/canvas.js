@@ -21,9 +21,10 @@ var hardBoards;
 var currBoard;
 
 var logicalBoard;
-
+var logicalDFSBoard;
 
 var solvedSquares = new Set();
+var btSquares = new Set();
 var originalSquares = new Set();
 var conflicts = new Set();
 
@@ -34,9 +35,10 @@ const DARK_BLUE = 'rgba(50, 100, 210, 0.3)';
 const LIGHT_RED = 'rgba(255, 0, 0, 0.5)';
 const LIGHTER_RED = 'rgba(200, 0, 0, 0.2)';
 const LIGHT_GREEN = 'rgba(0, 200, 0, 0.2)';
+const YELLOW = 'rgba(255, 247, 0, 0.2)';
 const LIGHT_GREY = '#BBBBBB';
 const DARK_GREY = '#888888';
-var sleepTime = 0.001;
+var sleepTime = 0.002;
 var inSolve = false;
 var solvingLogical = false;
 var squaresChecked = 0;
@@ -67,13 +69,13 @@ function startupDrawCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawConflicts();
-    drawSolvedSqaures();
+    drawSqaures(solvedSquares, LIGHT_GREEN);
     drawGrid();
     if (selected.x != -1 && selected.y != -1) {
         drawSquares(selected.x, selected.y);
     }
     if (!solvingLogical) {
-        drawNumbers();
+        drawNumbers(board);
     } else {
         drawLogicalNumbers();
     }
@@ -130,19 +132,36 @@ function updateCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawConflicts();
-    drawSolvedSqaures();
+    drawSqaures(solvedSquares, LIGHT_GREEN);
+    drawSqaures(btSquares, YELLOW);
     drawGrid();
     if (selected.x != -1 && selected.y != -1) {
         drawSquares(selected.x, selected.y);
     }
     if (!solvingLogical) {
-        drawNumbers();
+        drawNumbers(board);
     } else {
         drawLogicalNumbers();
     }
     document.getElementById('textButton').innerText = "Squares Checked: " + squaresChecked;
     document.getElementById('diffButton').innerText = "Difficulty: " + difficulty;
 }
+
+function updateLDFSCanvas(dfsSquares) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawSqaures(dfsSquares, YELLOW);
+    drawSqaures(solvedSquares, LIGHT_GREEN);
+    drawGrid();
+    if (selected.x != -1 && selected.y != -1) {
+        drawSquares(selected.x, selected.y);
+    }
+    drawNumbers(logicalDFSBoard);
+
+    document.getElementById('textButton').innerText = "Squares Checked: " + squaresChecked;
+    document.getElementById('diffButton').innerText = "Difficulty: " + difficulty;
+}
+
 
 // ###### SOLVING FUNCTIONS ######
 
@@ -160,6 +179,7 @@ async function solveBacktracking() {
         return;
     }
     beforeSolveBoard = copyBoard(board);
+    btSquares = new Set();
     solvedSquares = new Set();
     let index = 0;
     let stack = [];
@@ -168,13 +188,13 @@ async function solveBacktracking() {
     while (board[getY(index)][getX(index)] != 0) {
         index++;
     }
-    stack.push(getValidNumbers(getX(index), getY(index)));
+    stack.push(getValidNumbers(getX(index), getY(index), board));
     while (stack.size != 0 && index < 81 && inSolve == true) {
         updateCanvas();
         let tuple = stack[stack.length-1];
         if (tuple[1].size == 0) {
             board[getY(tuple[0])][getX(tuple[0])] = 0;
-            solvedSquares.delete(tuple[0]);
+            btSquares.delete(tuple[0]);
             stack.pop();
             index = stack[stack.length-1][0];
         } else {
@@ -183,20 +203,23 @@ async function solveBacktracking() {
             tuple[1].delete(num);
             board[getY(index)][getX(index)] = num;
 
-            solvedSquares.add(index);
+            btSquares.add(index);
 
             while (index < 81 && board[getY(index)][getX(index)] != 0) {
                 index++;
             }
 
             if (index < 81) {
-                stack.push(getValidNumbers(getX(index), getY(index)));
+                stack.push(getValidNumbers(getX(index), getY(index), board));
             }
         }
         await sleep(sleepTime);
         updateCanvas();
     }
     console.log(squaresChecked);
+    solvedSquares = btSquares;
+    btSquares = new Set();
+    updateCanvas();
 }
 
 async function solveLogical() {
@@ -212,7 +235,7 @@ async function solveLogical() {
         let validNumSet;
         for (let j = 0; j < 9; j++) {
             if (board[i][j] == 0) {
-                validNumSet = getValidNumbers(j,i)[1];
+                validNumSet = getValidNumbers(j,i, board)[1];
                 if (validNumSet.size == 1) {
                     solvedSquares.add(i * 9 + j);
                     board[i][j] = validNumSet.values().next().value;
@@ -239,33 +262,40 @@ async function solveLogical() {
     for (let index of solvedSquares) {
         updateCanvas()
         eliminateNum(logicalBoard[getY(index)][getX(index)].values().next().value, getX(index), getY(index));
-        await sleep(sleepTime * 100);
+        await sleep(sleepTime * 10);
     }
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
+        if (inSolve == false) {
+            updateCanvas();
+            return;
+        }
+        let numbersSolved = solvedSquares.size;
         await findNakedSingles();
         await findHiddenSingles();
         findPointingPairs();
         findNakedDoubles();
         if (solvedLogical()) {
+            await findNakedSingles();
             updateCanvas();
             inSolve = false;
             solvingLogical = false;
             return;
         }
+        if (numbersSolved == solvedSquares.size) {
+            break;
+        }
     }
 
-    logicalDFS()
-
+    logicalDFS();
     updateCanvas();
-    
 }
 
 async function findNakedSingles() {
     for (let i = 0; i < 9; i++) {
         for (let j = 0; j < 9; j++) {
             index = i * 9 + j;
-            if (!solvedSquares.has(index) && !originalSquares.has(index)) {
+            if (!solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
                 if (logicalBoard[i][j].size == 1) {
                     solvedSquares.add(index);
                     board[i][j] = logicalBoard[i][j].values().next().value;
@@ -283,11 +313,11 @@ async function findHiddenSingles() {
     for (let i = 0; i < 9; i++) {
         singleMap = new Map();
         highlightRow(i, DARK_BLUE);
-        await sleep(sleepTime * 100);
+        await sleep(sleepTime * 10);
         updateCanvas();
         for (let j = 0; j < 9; j++) {
             let index = i * 9 + j;
-            if (!solvedSquares.has(index) && !originalSquares.has(index)) {
+            if (!solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
                 squaresChecked++;
                 for (let num of logicalBoard[i][j]) {
                     if (!singleMap.has(num)) {
@@ -301,7 +331,7 @@ async function findHiddenSingles() {
         const numIterator = singleMap[Symbol.iterator]();
         for (const item of numIterator) {
             let index = i * 9 + item[1];
-            if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index)) {
+            if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
                 let j = item[1];
                 let newSet = new Set();
                 newSet.add(item[0]);
@@ -312,6 +342,11 @@ async function findHiddenSingles() {
                 updateCanvas();
                 highlightRow(i, DARK_BLUE);
                 await sleep(sleepTime * 10);
+
+                if (inSolve == false) {
+                    updateCanvas();
+                    return;
+                }
 
                 updateCanvas()
                 eliminateNum(item[0], j, i);
@@ -324,11 +359,11 @@ async function findHiddenSingles() {
     for (let j = 0; j < 9; j++) {
         singleMap = new Map();
         highlightColumn(j, DARK_BLUE);
-        await sleep(sleepTime * 100);
+        await sleep(sleepTime * 10);
         updateCanvas();
         for (let i = 0; i < 9; i++) {
             let index = i * 9 + j;
-            if (!solvedSquares.has(index) && !originalSquares.has(index)) {
+            if (!solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
                 squaresChecked++;
                 for (let num of logicalBoard[i][j]) {
                     if (!singleMap.has(num)) {
@@ -342,7 +377,7 @@ async function findHiddenSingles() {
         const numIterator = singleMap[Symbol.iterator]();
         for (const item of numIterator) {
             let index = item[1] * 9 + j;
-            if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index)) {
+            if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
                 let i = item[1];
                 let newSet = new Set();
                 newSet.add(item[0]);
@@ -353,6 +388,11 @@ async function findHiddenSingles() {
                 highlightColumn(j, DARK_BLUE);
                 await sleep(sleepTime * 10);
 
+                if (inSolve == false) {
+                    updateCanvas();
+                    return;
+                }
+
                 updateCanvas()
                 eliminateNum(item[0], j, i);
                 await sleep(sleepTime * 10);
@@ -361,16 +401,64 @@ async function findHiddenSingles() {
     }
 }
 
-function findPointingPairs() {
+async function findPointingPairs() {
 
 }
 
-function findNakedDoubles() {
+async function findNakedDoubles() {
 
 }
 
-function logicalDFS() {
-    
+async function logicalDFS() {
+    let dfsSquares = new Set();
+    let index = 0;
+    let stack = [];
+    initializeDFSBoard();
+    while (logicalDFSBoard[getY(index)][getX(index)] != 0) {
+        index++;
+    }
+    stack.push(getValidNumbers(getX(index),getY(index), logicalDFSBoard));
+    while (stack.size != 0 && index < 81 && inSolve == true) {
+        updateLDFSCanvas(dfsSquares);
+        let tuple = stack[stack.length-1];
+        if (tuple[1].size == 0) {
+            logicalDFSBoard[getY(tuple[0])][getX(tuple[0])] = 0;
+            dfsSquares.delete(tuple[0]);
+            stack.pop();
+            index = stack[stack.length-1][0];
+        } else {
+            index = tuple[0];
+            let num = tuple[1].values().next().value;
+            tuple[1].delete(num);
+            logicalDFSBoard[getY(index)][getX(index)] = num;
+
+            dfsSquares.add(index);
+
+            while (index < 81 && logicalDFSBoard[getY(index)][getX(index)] != 0) {
+                index++;
+            }
+
+            if (index < 81) {
+                stack.push(getValidNumbers(getX(index),getY(index), logicalDFSBoard));
+            }
+        }
+        await sleep(sleepTime);
+        updateLDFSCanvas(dfsSquares);
+    }
+    console.log(squaresChecked);
+    board = copyBoard(logicalDFSBoard);
+    inSolve = false;
+    solvingLogical = false;
+}
+
+function initializeDFSBoard() {
+    logicalDFSBoard = copyBoard(emptyBoard);
+    for (let index of solvedSquares) {
+        logicalDFSBoard[getY(index)][getX(index)] = logicalBoard[getY(index)][getX(index)].values().next().value;
+    }
+    for (let index of originalSquares) {
+        logicalDFSBoard[getY(index)][getX(index)] = logicalBoard[getY(index)][getX(index)].values().next().value;
+    }
 }
 
 function solvedLogical() {
@@ -417,24 +505,27 @@ function eliminateNum(number, x, y) {
 }
 
 async function sleep(seconds) {
-    return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+    if (sleepTime >= 0) {
+        return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+    }
+    
 }
 
 // returns a tuple [index, set]
-function getValidNumbers(x, y) {
+function getValidNumbers(x, y, b) {
     squaresChecked++;
     const newSet = new Set([1,2,3,4,5,6,7,8,9]);
     
     for (let i = 0; i < 9; i++) {
-        newSet.delete(board[y][i]);
-        newSet.delete(board[i][x]);
+        newSet.delete(b[y][i]);
+        newSet.delete(b[i][x]);
     }
 
     let xFloor = Math.floor(x/3) * 3;
     let yFloor = Math.floor(y/3) * 3;
     for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-            newSet.delete(board[yFloor + j][xFloor + i]);
+            newSet.delete(b[yFloor + j][xFloor + i]);
         }
     }
     return [x + y * 9, newSet];
@@ -551,11 +642,11 @@ function drawConflicts() {
     }
 }
 
-function drawNumbers() {
+function drawNumbers(drawboard) {
     for (let i = 0; i < 9; i++) {
         for (let j = 0; j < 9; j++) {
-            if (board[j][i] != 0) {
-                drawNumber(board[j][i], i, j);
+            if (drawboard[j][i] != 0) {
+                drawNumber(drawboard[j][i], i, j);
             }
         }
     }
@@ -567,9 +658,9 @@ function drawNumber(number, x, y) {
     ctx.fillText(number.toString(), SQUARE_SIZE * (x + 0.31), SQUARE_SIZE * (y + 0.75));
 }
 
-function drawSolvedSqaures() {
-    for (index of solvedSquares) {
-        drawSquare(LIGHT_GREEN, getX(index), getY(index));
+function drawSqaures(squares, color) {
+    for (index of squares) {
+        drawSquare(color, getX(index), getY(index));
     }
 }
 
@@ -673,6 +764,7 @@ function setLogical() {
 }
 
 function toggleDifficulty() {
+
     if (difficulty == "Easy") {
         difficulty = "Medium";
     } else if (difficulty == "Medium") {
@@ -687,6 +779,9 @@ function toggleDifficulty() {
 
 function setRandomPuzzle() {
     inSolve = false;
+    solvingLogical = false;
+    resetBoard();
+    resetBoard();
     board = copyBoard(getBoard());
     beforeSolveBoard = copyBoard(emptyBoard);
     squaresChecked = 0;
