@@ -11,8 +11,9 @@
     <body class = "body">
         <header class = 'header'>
             <b class = 'titleText'>
-                Sudoku Solver
+                Sudoku Visualizer
             </b>
+            <button class="topButton speed" id="speedButton" onclick="toggleSpeed()">Speed: Slow</button>
             <button class="topButton backtracking" id="backtrackingButton" onclick="setBacktracking()">Backtracking</button>
             <button class="topButton logical" id ="logicalButton" onclick="setLogical()">Logical</button>
             <button class="topButton difficulty" id = "diffButton" onclick="toggleDifficulty()">Difficulty: Easy</button>
@@ -28,6 +29,7 @@
         </div>
         <div class = "buttonDiv">
             <button class="textButton" id="textButton" disabled onload="startup()">Squares Checked: 0 </button>
+            <button class="textButton" id="algoButton" disabled onload="startup()">Current Algorithm: Backtracking</button>
         </div>
     </body>
 </html>

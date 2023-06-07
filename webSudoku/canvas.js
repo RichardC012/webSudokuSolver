@@ -38,12 +38,14 @@ const LIGHT_GREEN = 'rgba(0, 200, 0, 0.2)';
 const YELLOW = 'rgba(255, 247, 0, 0.2)';
 const LIGHT_GREY = '#BBBBBB';
 const DARK_GREY = '#888888';
-var sleepTime = 0.002;
+var sleepTime = 0.05;
+var speed = "Slow";
 var inSolve = false;
 var solvingLogical = false;
 var squaresChecked = 0;
 var difficulty = "Easy";
 var solveStyle = "Backtracking";
+var currentAlgorithm = "Backtracking"
 
 canvas.width = CANVAS_SIZE;
 canvas.height = CANVAS_SIZE;
@@ -124,6 +126,7 @@ function resetBoard() {
     }
     conflicts = new Set();
     solvedSquares = new Set();
+    btSquares = new Set();
     squaresChecked = 0;
     updateCanvas();
 }
@@ -143,8 +146,7 @@ function updateCanvas() {
     } else {
         drawLogicalNumbers();
     }
-    document.getElementById('textButton').innerText = "Squares Checked: " + squaresChecked;
-    document.getElementById('diffButton').innerText = "Difficulty: " + difficulty;
+    updateButtons();
 }
 
 function updateLDFSCanvas(dfsSquares) {
@@ -157,11 +159,15 @@ function updateLDFSCanvas(dfsSquares) {
         drawSquares(selected.x, selected.y);
     }
     drawNumbers(logicalDFSBoard);
-
-    document.getElementById('textButton').innerText = "Squares Checked: " + squaresChecked;
-    document.getElementById('diffButton').innerText = "Difficulty: " + difficulty;
+    updateButtons();
 }
 
+function updateButtons() {
+    document.getElementById('textButton').innerText = "Squares Checked: " + squaresChecked;
+    document.getElementById('algoButton').innerText = "Current Algorithm: " + currentAlgorithm;
+    document.getElementById('diffButton').innerText = "Difficulty: " + difficulty;
+    document.getElementById('speedButton').innerText = "Speed: " + speed;
+}
 
 // ###### SOLVING FUNCTIONS ######
 
@@ -185,6 +191,7 @@ async function solveBacktracking() {
     let stack = [];
     squaresChecked = 0;
     inSolve = true;
+    currentAlgorithm = "Backtracking";
     while (board[getY(index)][getX(index)] != 0) {
         index++;
     }
@@ -234,6 +241,9 @@ async function solveLogical() {
         rowArr = [];
         let validNumSet;
         for (let j = 0; j < 9; j++) {
+            if (inSolve == false) {
+                return;
+            }
             if (board[i][j] == 0) {
                 validNumSet = getValidNumbers(j,i, board)[1];
                 if (validNumSet.size == 1) {
@@ -260,6 +270,9 @@ async function solveLogical() {
     }
     
     for (let index of solvedSquares) {
+        if (inSolve == false) {
+            return;
+        }
         updateCanvas()
         eliminateNum(logicalBoard[getY(index)][getX(index)].values().next().value, getX(index), getY(index));
         await sleep(sleepTime * 10);
@@ -292,6 +305,7 @@ async function solveLogical() {
 }
 
 async function findNakedSingles() {
+    currentAlgorithm = "Naked Singles";
     for (let i = 0; i < 9; i++) {
         for (let j = 0; j < 9; j++) {
             index = i * 9 + j;
@@ -310,6 +324,7 @@ async function findNakedSingles() {
 
 async function findHiddenSingles() {
     // Check every Row
+    currentAlgorithm = "Hidden Singles";
     for (let i = 0; i < 9; i++) {
         singleMap = new Map();
         highlightRow(i, DARK_BLUE);
@@ -332,6 +347,9 @@ async function findHiddenSingles() {
         for (const item of numIterator) {
             let index = i * 9 + item[1];
             if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
+                if (inSolve == false) {
+                    return;
+                }
                 let j = item[1];
                 let newSet = new Set();
                 newSet.add(item[0]);
@@ -351,6 +369,7 @@ async function findHiddenSingles() {
                 updateCanvas()
                 eliminateNum(item[0], j, i);
                 await sleep(sleepTime * 10);
+                updateCanvas();
             }
         }
     }
@@ -378,6 +397,9 @@ async function findHiddenSingles() {
         for (const item of numIterator) {
             let index = item[1] * 9 + j;
             if (item[1] != -1 && !solvedSquares.has(index) && !originalSquares.has(index) && inSolve == true) {
+                if (inSolve == false) {
+                    return;
+                }
                 let i = item[1];
                 let newSet = new Set();
                 newSet.add(item[0]);
@@ -396,6 +418,7 @@ async function findHiddenSingles() {
                 updateCanvas()
                 eliminateNum(item[0], j, i);
                 await sleep(sleepTime * 10);
+                updateCanvas();
             }
         }
     }
@@ -410,6 +433,7 @@ async function findNakedDoubles() {
 }
 
 async function logicalDFS() {
+    currentAlgorithm = "Elimination";
     let dfsSquares = new Set();
     let index = 0;
     let stack = [];
@@ -774,7 +798,29 @@ function toggleDifficulty() {
     } else {
         difficulty = "Easy";
     }
-    updateCanvas();
+    updateButtons();
+    
+}
+
+function toggleSpeed() {
+
+    if (speed == "Slow") {
+        speed = "Medium";
+        sleepTime = 0.02;
+    } else if (speed == "Medium") {
+        speed = "Fast";
+        sleepTime = 0.01;
+    } else if (speed == "Fast") {
+        speed = "Instant";
+        sleepTime = -1;
+    } else if (speed == "Instant") {
+        speed = "Slow";
+        sleepTime = 0.05;
+    } else {
+        speed = "Slow";
+        sleepTime = 0.01;
+    }
+    updateButtons();
 }
 
 function setRandomPuzzle() {
