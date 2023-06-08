@@ -809,7 +809,7 @@ function toggleSpeed() {
         sleepTime = 0.02;
     } else if (speed == "Medium") {
         speed = "Fast";
-        sleepTime = 0.01;
+        sleepTime = 0.001;
     } else if (speed == "Fast") {
         speed = "Instant";
         sleepTime = -1;
@@ -818,7 +818,7 @@ function toggleSpeed() {
         sleepTime = 0.05;
     } else {
         speed = "Slow";
-        sleepTime = 0.01;
+        sleepTime = 0.05;
     }
     updateButtons();
 }
