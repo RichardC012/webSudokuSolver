@@ -28,16 +28,6 @@ var btSquares = new Set();
 var originalSquares = new Set();
 var conflicts = new Set();
 
-const CANVAS_SIZE = 600;
-const SQUARE_SIZE = CANVAS_SIZE/9;
-const LIGHT_BLUE = 'rgba(84, 194, 237, 0.2)';
-const DARK_BLUE = 'rgba(50, 100, 210, 0.3)';
-const LIGHT_RED = 'rgba(255, 0, 0, 0.5)';
-const LIGHTER_RED = 'rgba(200, 0, 0, 0.2)';
-const LIGHT_GREEN = 'rgba(0, 200, 0, 0.2)';
-const YELLOW = 'rgba(255, 247, 0, 0.2)';
-const LIGHT_GREY = '#BBBBBB';
-const DARK_GREY = '#888888';
 var sleepTime = 0.05;
 var speed = "Slow";
 var inSolve = false;
@@ -58,8 +48,21 @@ var selected = {
     y: -1,
 }
 
+// CONSTANTS
+const CANVAS_SIZE = 600;
+const SQUARE_SIZE = CANVAS_SIZE/9;
+const LIGHT_BLUE = 'rgba(84, 194, 237, 0.2)';
+const DARK_BLUE = 'rgba(50, 100, 210, 0.3)';
+const LIGHT_RED = 'rgba(255, 0, 0, 0.5)';
+const LIGHTER_RED = 'rgba(200, 0, 0, 0.2)';
+const LIGHT_GREEN = 'rgba(0, 200, 0, 0.2)';
+const YELLOW = 'rgba(255, 247, 0, 0.2)';
+const LIGHT_GREY = '#BBBBBB';
+const DARK_GREY = '#888888';
+
 startup();
 
+// Function that runs when the algoButton is loaded, initializes variables
 function startup() {
     setPresetBoards();
     setBacktracking();
@@ -67,6 +70,7 @@ function startup() {
 }
 
 // Same as update canvas but without buttons because for some reason document.getElementById("#textButton") returns NULL and that disables canvas interactivity
+// Updates Canvas
 function startupDrawCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -149,6 +153,7 @@ function updateCanvas() {
     updateButtons();
 }
 
+// Updates the canvas during Logical DFS 
 function updateLDFSCanvas(dfsSquares) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -425,11 +430,11 @@ async function findHiddenSingles() {
 }
 
 async function findPointingPairs() {
-
+    // TODO
 }
 
 async function findNakedDoubles() {
-
+    // TODO
 }
 
 async function logicalDFS() {
